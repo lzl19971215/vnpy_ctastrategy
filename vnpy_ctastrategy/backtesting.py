@@ -66,6 +66,7 @@ class BacktestingEngine:
         self.datetime: datetime = None
 
         self.interval: Interval = None
+        self.custom_interval: timedelta = None
         self.days: int = 0
         self.callback: Callable = None
         self.history_data: list = []
@@ -122,12 +123,14 @@ class BacktestingEngine:
         end: datetime = None,
         mode: BacktestingMode = BacktestingMode.BAR,
         risk_free: float = 0,
-        annual_days: int = 240
+        annual_days: int = 240,
+        custom_interval: timedelta = timedelta(seconds=0)
     ) -> None:
         """"""
         self.mode = mode
         self.vt_symbol = vt_symbol
         self.interval = Interval(interval)
+        self.custom_interval = custom_interval
         self.rate = rate
         self.slippage = slippage
         self.size = size
@@ -171,7 +174,10 @@ class BacktestingEngine:
         total_days: int = (self.end - self.start).days
         progress_days: int = max(int(total_days / 10), 1)
         progress_delta: timedelta = timedelta(days=progress_days)
-        interval_delta: timedelta = INTERVAL_DELTA_MAP[self.interval]
+        interval_delta: timedelta = INTERVAL_DELTA_MAP[self.interval] if self.interval != Interval.CUSTOM else self.custom_interval
+        if interval_delta.seconds == 0:
+            self.output(f"Interval should not be 0!")
+            return;
 
         start: datetime = self.start
         end: datetime = self.start + progress_delta
@@ -189,7 +195,8 @@ class BacktestingEngine:
                     self.exchange,
                     self.interval,
                     start,
-                    end
+                    end,
+                    custom_interval=self.custom_interval
                 )
             else:
                 data: List[TickData] = load_tick_data(
@@ -1068,13 +1075,14 @@ def load_bar_data(
     exchange: Exchange,
     interval: Interval,
     start: datetime,
-    end: datetime
+    end: datetime,
+    custom_interval=timedelta(seconds=0)
 ) -> List[BarData]:
     """"""
     database: BaseDatabase = get_database()
 
     return database.load_bar_data(
-        symbol, exchange, interval, start, end
+        symbol, exchange, interval, start, end, custom_interval=custom_interval
     )
 
 
